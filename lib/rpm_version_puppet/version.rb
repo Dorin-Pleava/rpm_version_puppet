@@ -166,9 +166,9 @@ class Error < StandardError; end
     # alphanumerics and the characters . + - ~ , starts with a digit, ~ only of rpm_revision is present
     REGEX_UPSTREAM_VERSION = '([\.\+~0-9a-zA-Z-]+?)'
     #alphanumerics and the characters + . ~
-    REGEX_DEBIAN_REVISION = '(?:-([\.\+~0-9a-zA-Z]*))?'
+    REGEX_RPM_REVISION = '(?:-([\.\+~0-9a-zA-Z]*))?'
 
-    REGEX_FULL    = REGEX_EPOCH + REGEX_UPSTREAM_VERSION + REGEX_DEBIAN_REVISION.freeze
+    REGEX_FULL    = REGEX_EPOCH + REGEX_UPSTREAM_VERSION + REGEX_RPM_REVISION.freeze
     REGEX_FULL_RX = /\A#{REGEX_FULL}\Z/.freeze
   end
 
