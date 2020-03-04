@@ -43,14 +43,47 @@ module RpmVersionPuppet
 
     class ValidationFailure < ArgumentError; end
 
-    def self.parse(ver)
-      match, epoch, upstream_version, rpm_revision = *ver.match(REGEX_FULL_RX)
+    def self.parse(s)
+      # match, epoch, upstream_version, rpm_revision = *ver.match(REGEX_FULL_RX)
 
-      unless match
-        raise ValidationFailure, "Unable to parse '#{ver}' as a rpm version identifier"
+      # unless match
+        # raise ValidationFailure, "Unable to parse '#{ver}' as a rpm version identifier"
+      # end
+
+      # new(epoch.to_i, upstream_version, rpm_revision).freeze
+
+
+
+      ei = s.index(':')
+      if ei
+        e = s[0, ei]
+        s = s[ei + 1, s.length]
+      else
+        e = nil
       end
+      begin
+        e = String(Integer(e))
+      rescue StandardError
+        # If there are non-digits in the epoch field, default to nil
+        e = nil
+      end
+      ri = s.index('-')
+      if ri
+        v = s[0, ri]
+        r = s[ri + 1, s.length]
+        if arch = r.scan(ARCH_REGEX)[0]
+          a = arch.delete('.')
+          r.gsub!(ARCH_REGEX, '')
+        end
+      else
+        v = s
+        r = nil
+      end
+      # { epoch: e, version: v, release: r, arch: a }
 
-      new(epoch.to_i, upstream_version, rpm_revision).freeze
+
+      new(e, v, r, a).freeze
+
     end
 
     # def self.match_digits(a)
@@ -209,7 +242,7 @@ module RpmVersionPuppet
 
     # comment
     def self.compare_rpm_versions(mine, yours)
-      rpm_compareEVR(rpm_parse_evr(yours), rpm_parse_evr(mine))
+      rpm_compareEVR(parse(mine), parse(yours))
     end
 
     # this method is a native implementation of the
@@ -238,15 +271,15 @@ module RpmVersionPuppet
     # "mine" will always be at least v-r, can be e:v-r
     def self.rpm_compareEVR(yours, mine)
 
-      # binding.pry
+      binding.pry
       # pass on to rpm labelCompare
 
-      unless yours[:epoch].nil?
-        rc = compare_values(yours[:epoch], mine[:epoch])
+      unless yours.epoch.nil?
+        rc = compare_values(yours.epoch, mine.epoch)
         return rc unless rc == 0
       end
 
-      rc = compare_values(yours[:version], mine[:version])
+      rc = compare_values(yours.version, mine.version)
       return rc unless rc == 0
 
       # here is our special case, PUP-1244.
@@ -258,26 +291,43 @@ module RpmVersionPuppet
       # This should NOT be triggered if we're trying to ensure latest.
       return 0 if yours[:release].nil?
 
-      rc = compare_values(yours[:release], mine[:release])
+      rc = compare_values(yours.release, mine.release)
 
       rc
     end
 
-    def initialize(epoch, upstream_version, rpm_revision)
-      @epoch            = epoch
-      @upstream_version = upstream_version
-      @rpm_revision = rpm_revision
+    def initialize(epoch, version, release, arch)
+      @epoch   = epoch
+      @version = version
+      @release = release
+      @arch    = arch
     end
 
-    attr_reader :epoch, :upstream_version, :rpm_revision
+    attr_reader :epoch, :version, :release, :arch
 
-    def to_s
-      s = @upstream_version
-      s = "#{@epoch}:" + s if @epoch != 0
-      s += "-#{@rpm_revision}" if @rpm_revision
-      s
-    end
-    alias inspect to_s
+    # def to_s
+
+    #   if @epoch
+    #     return "#{@epoch}:#{s}"
+    #   end
+
+    #   return s
+    # end
+    # alias inspect to_s
+
+
+    # def to_string_version
+    #   # binding.pry
+
+    #   s = "#{@version}-#{@release}"
+
+    #   if @epoch
+    #     return "#{@epoch}:#{s}"
+    #   end
+
+    #   return s
+    # end
+
 
     def eql?(other)
       other.is_a?(Version) &&
@@ -288,12 +338,19 @@ module RpmVersionPuppet
     alias == eql?
 
     def <=>(other)
+      binding.pry
       return nil unless other.is_a?(Version)
 
       cmp = @epoch <=> other.epoch
       if cmp == 0
-        cmp = compare_upstream_version(other)
-        cmp = compare_rpm_revision(other) if cmp == 0
+        # cmp = compare_upstream_version(other)
+        # cmp = compare_rpm_revision(other) if cmp == 0
+
+        # current = arse(@epoch, @version, @release, @arch)
+
+        # cmp = Version.compare_rpm_versions(current, other)
+        cmp = Version.rpm_compareEVR(other, self)
+
       end
       cmp
     end
